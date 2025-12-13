@@ -1,0 +1,197 @@
+#!/bin/bash
+clear
+
+# ================= ROOT CHECK =================
+[[ "$(id -u)" != "0" ]] && {
+  echo -e "\033[1;31m[ERRO]\033[0m Execute como root"
+  exit 1
+}
+
+export DEBIAN_FRONTEND=noninteractive
+HOME=/root
+
+# ================= ORIGINAL VARS =================
+_lnk=$(echo 'z1:y#x.5s0ul&p4hs$s.0a72d*n-e!v89e032:3r' | sed 's/[^a-z.]//ig' | rev)
+_Ink=$(echo '/3×u3#s87r/l32o4×c1a×l1/83×l24×i0b×' | sed 's/[^a-z/]//ig')
+_1nk=$(echo '/3×u3#s×87r/83×l2×4×i0b×' | sed 's/[^a-z/]//ig')
+
+mkdir -p $_Ink
+cd $HOME
+
+# ================= LOADING BAR =================
+fun_bar() {
+  ( $1 >/dev/null 2>&1 ) &
+  pid=$!
+  echo -ne "  AGUARDE ["
+  while ps -p $pid >/dev/null 2>&1; do
+    echo -ne "#"
+    sleep 0.15
+  done
+  echo -e "] OK"
+}
+
+# ================= KEY CHECK =================
+verif_key()  { [[ ! -f "$_Ink/list" ]] && { echo "KEY INVÁLIDA"; exit 1; }; }
+verif_key2() { [[ ! -f "$_Ink/listARM" ]] && { echo "KEY INVÁLIDA"; exit 1; }; }
+
+# ================= OS FIX =================
+fix_os() {
+  # SSH port fix
+  sed -i 's/^#Port 22/Port 22/' /etc/ssh/sshd_config
+  sed -i 's/^Port .*/Port 22/' /etc/ssh/sshd_config
+  systemctl restart ssh 2>/dev/null || systemctl restart sshd
+
+  # Python fix
+  apt update -y
+  apt install -y python3 python3-pip python-is-python3 socat
+  ln -sf /usr/bin/python3 /usr/bin/python
+
+  # netstat fallback
+  command -v netstat >/dev/null 2>&1 || alias netstat='ss -tunlp'
+
+  # Firewall
+  apt install -y ufw
+  ufw --force enable
+  ufw allow 22/tcp
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw allow 2086/tcp
+  ufw allow 2087/tcp
+  ufw allow 1194/tcp
+}
+
+# ================= WS SERVICES =================
+install_ws_services() {
+
+# SSH WS 80
+cat >/usr/local/bin/ssh-ws.py <<'EOF'
+import socket,threading
+L=80;T=("127.0.0.1",22)
+def h(c):
+ s=socket.socket();s.connect(T)
+ threading.Thread(target=f,args=(c,s)).start()
+ threading.Thread(target=f,args=(s,c)).start()
+def f(a,b):
+  try:
+   while True:
+    d=a.recv(4096)
+    if not d: break
+    b.sendall(d)
+  except: pass
+sock=socket.socket();sock.bind(("0.0.0.0",L));sock.listen(100)
+while True:
+ c,_=sock.accept()
+ threading.Thread(target=h,args=(c,)).start()
+EOF
+
+chmod +x /usr/local/bin/ssh-ws.py
+
+cat >/etc/systemd/system/ssh-ws.service <<EOF
+[Unit]
+After=network.target
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/ssh-ws.py
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# SSL WS 443
+mkdir -p /etc/ssl/ws
+openssl req -newkey rsa:2048 -nodes -keyout /etc/ssl/ws/key.pem \
+-x509 -days 365 -out /etc/ssl/ws/cert.pem -subj "/CN=ws"
+
+cat >/usr/local/bin/ssl-ws.py <<'EOF'
+import socket,ssl,threading
+L=443;T=("127.0.0.1",22)
+ctx=ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+ctx.load_cert_chain("/etc/ssl/ws/cert.pem","/etc/ssl/ws/key.pem")
+def h(c):
+ s=socket.socket();s.connect(T)
+ threading.Thread(target=f,args=(c,s)).start()
+ threading.Thread(target=f,args=(s,c)).start()
+def f(a,b):
+  try:
+   while True:
+    d=a.recv(4096)
+    if not d: break
+    b.sendall(d)
+  except: pass
+sock=socket.socket();sock.bind(("0.0.0.0",L));sock.listen(100)
+while True:
+ c,_=sock.accept()
+ sc=ctx.wrap_socket(c,server_side=True)
+ threading.Thread(target=h,args=(sc,)).start()
+EOF
+
+chmod +x /usr/local/bin/ssl-ws.py
+
+cat >/etc/systemd/system/ssl-ws.service <<EOF
+[Unit]
+After=network.target
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/ssl-ws.py
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Dropbear WS
+apt install -y dropbear
+sed -i 's/NO_START=1/NO_START=0/' /etc/default/dropbear
+sed -i 's/DROPBEAR_PORT=.*/DROPBEAR_PORT=109/' /etc/default/dropbear
+systemctl restart dropbear
+
+cat >/usr/local/bin/dropbear-ws.sh <<EOF
+#!/bin/bash
+socat TCP-LISTEN:2086,reuseaddr,fork TCP:127.0.0.1:109
+EOF
+chmod +x /usr/local/bin/dropbear-ws.sh
+
+cat >/etc/systemd/system/dropbear-ws.service <<EOF
+[Unit]
+After=network.target
+[Service]
+ExecStart=/usr/local/bin/dropbear-ws.sh
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# OpenVPN WS (assumes OpenVPN already used by SSHPLUS)
+cat >/usr/local/bin/ovpn-ws.sh <<EOF
+#!/bin/bash
+socat TCP-LISTEN:2087,reuseaddr,fork TCP:127.0.0.1:1194
+EOF
+chmod +x /usr/local/bin/ovpn-ws.sh
+
+cat >/etc/systemd/system/ovpn-ws.service <<EOF
+[Unit]
+After=network.target
+[Service]
+ExecStart=/usr/local/bin/ovpn-ws.sh
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable ssh-ws ssl-ws dropbear-ws ovpn-ws
+systemctl restart ssh-ws ssl-ws dropbear-ws ovpn-ws
+}
+
+# ================= RUN FIX =================
+fun_bar fix_os
+fun_bar install_ws_services
+
+clear
+echo "===================================="
+echo " SSHPLUS FIX COMPLETED (NO MENU TOUCH)"
+echo "===================================="
+echo "SSH          : 22"
+echo "SSH WS       : 80"
+echo "SSL WS       : 443"
+echo "Dropbear WS  : 2086"
+echo "OpenVPN WS   : 2087"
+echo ""
+echo "SSHPLUS menu / users / limits = ORIGINAL"
