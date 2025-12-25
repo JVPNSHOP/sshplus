@@ -1,0 +1,108 @@
+#!/bin/bash
+clear
+
+# 1. Root check
+[[ "$(whoami)" != "root" ]] && { 
+    echo -e "\033[1;33m[\033[1;31mError\033[1;33m] \033[1;37m- \033[1;33mYou must run this script as root\033[0m"
+    exit 1 
+}
+
+# 2. Paths logic (Original)
+_lnk=$(echo 'z1:y#x.5s0ul&p4hs$s.0a72d*n-e!v89e032:3r' | sed -e 's/[^a-z.]//ig' | rev)
+_Ink=$(echo '/3×u3#s87r/l32o4×c1a×l1/83×l24×i0b×' | sed -e 's/[^a-z/]//ig')
+_1nk=$(echo '/3×u3#s×87r/83×l2×4×i0b×' | sed -e 's/[^a-z/]//ig')
+
+cd $HOME
+
+# 3. Simple Progress Bar (Fixed for Mobile)
+fun_bar() {
+    comando[0]="$1"
+    comando[1]="$2"
+    (
+        [[ -e $HOME/fim ]] && rm $HOME/fim
+        ${comando[0]} -y >/dev/null 2>&1
+        ${comando[1]} -y >/dev/null 2>&1
+        touch $HOME/fim
+    ) >/dev/null 2>&1 &
+    echo -ne " \033[1;33mWAITING \033[1;37m- \033[1;33m["
+    while true; do
+        echo -ne "\033[1;31m#"
+        sleep 0.2s
+        [[ -e $HOME/fim ]] && rm $HOME/fim && break
+    done
+    echo -e "\033[1;33m]\033[1;37m -\033[1;32m OK !\033[1;37m"
+}
+
+# 4. Modern OS Python Fix (Ubuntu 22/24 & Debian 11/12)
+otimize_python() {
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get install python3 python3-pip socat -y >/dev/null 2>&1
+    [[ ! -f /usr/bin/python ]] && ln -s /usr/bin/python3 /usr/bin/python >/dev/null 2>&1
+    return 0
+}
+
+# 5. Banner
+echo -e "\033[1;31m════════════════════════════════════════════════════\033[0m"
+tput setaf 7; tput setab 4; tput bold
+printf '%40s%s%-12s\n' "SSHPLUS MANAGER - ENGLISH VERSION"
+tput sgr0
+echo -e "\033[1;31m════════════════════════════════════════════════════\033[0m"
+
+echo -ne "\033[1;36mGENERATE FREE KEY [Y/N]: \033[1;37m"
+read x
+[[ $x =~ ^[nN]$ ]] && exit
+
+echo -e "\033[1;36mSelect VPS Architecture: \033[1;37m"
+echo -e "[1] - x86_64"
+echo -e "[2] - aarch64 (ARM)"
+echo -ne "\033[1;36mOption: \033[1;37m"
+read respuesta
+
+# 6. SSH Config
+sed -i 's/Port 22222/Port 22/g' /etc/ssh/sshd_config >/dev/null 2>&1
+systemctl restart ssh >/dev/null 2>&1
+
+# 7. Core Installation Logic
+if [[ "$respuesta" = '1' ]]; then
+    mkdir -p /etc/rec
+    echo -e "\n\033[1;36mVERIFYING... \033[0m"
+    wget -O $_Ink/list https://raw.githubusercontent.com/sansoe2022/VPN_SCRIPT/refs/heads/main/Install/list >/dev/null 2>&1
+    # မူရင်း script ထဲကအတိုင်း ဖိုင်တွေပြန်သွင်းမယ်
+    wget -O /bin/v2raymanager https://raw.githubusercontent.com/sansoe2022/VPN_SCRIPT/refs/heads/main/Modulos/v2raymanager >/dev/null 2>&1
+    chmod 777 /bin/v2raymanager
+elif [[ "$respuesta" = '2' ]]; then
+    echo -e "\n\033[1;36mVERIFYING ARM... \033[0m"
+    wget -O $_Ink/listARM https://www.dropbox.com/s/cs5poyigwm97dyd/listARM >/dev/null 2>&1
+    wget -O /bin/v2raymanager https://raw.githubusercontent.com/kiritosshxd/SSHPLUS/main/Modulos/v2raymanager >/dev/null 2>&1
+    chmod 777 /bin/v2raymanager
+fi
+
+# 8. Essential Links (Menu command fix)
+# ဒီနေရာမှာ list ဖိုင်ကို ခေါ်လိုက်တာနဲ့ menu တွေအကုန် install လုပ်သွားမှာပါ
+bash $_Ink/list $_lnk $_Ink $_1nk "FREE" >/dev/null 2>&1
+echo "/bin/menu" > /bin/h && chmod +x /bin/h
+
+# 9. System Update & Packages
+echo -e "\n \033[1;33m[\033[1;31m!\033[1;33m] \033[1;32mUPDATING SYSTEM \033[0m"
+fun_bar 'apt-get update'
+
+echo -e "\n \033[1;33m[\033[1;31m!\033[1;33m] \033[1;32mINSTALLING PACKAGES \033[0m"
+inst_pct() {
+    export DEBIAN_FRONTEND=noninteractive
+    _pacotes="bc screen nano unzip lsof net-tools dos2unix nload jq curl figlet python3 at"
+    apt-get install -y $_pacotes >/dev/null 2>&1
+}
+fun_bar 'inst_pct'
+
+echo -e "\n \033[1;33m[\033[1;31m!\033[1;33m] \033[1;32mOPTIMIZING PYTHON \033[0m"
+fun_bar 'otimize_python'
+
+# 10. Completion
+clear
+echo -e "\n \033[1;33m • \033[1;32mINSTALLATION COMPLETED\033[1;33m • \033[0m"
+echo -e "\033[1;33mMAIN COMMAND: \033[1;32mmenu\033[0m"
+echo ""
+# မူရင်း script ထဲကအတိုင်း menu command အလုပ်လုပ်အောင် သေချာအောင်လုပ်ခြင်း
+[[ -f /bin/menu ]] && chmod +x /bin/menu
+
+history -c
